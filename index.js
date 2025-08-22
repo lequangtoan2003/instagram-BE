@@ -1,9 +1,9 @@
 import express, { urlencoded } from "express";
 import cors from "cors";
-import mongoose from "mongoose";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import connectDB from "./configs/db.js";
+import userRoute from "./routes/user.route.js";
 dotenv.config();
 
 const app = express();
@@ -21,9 +21,12 @@ app.use(express.json());
 app.use(urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Import routes
+app.use("/api/v1/user", userRoute);
+
 app.listen(PORT, () => {
   connectDB();
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`✅ Server is running on port ${PORT}`);
 });
 
 app.get("/", (req, res) => {
