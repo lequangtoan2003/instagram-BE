@@ -117,7 +117,12 @@ export const logout = async (_, res) => {
 export const getProfile = async (req, res) => {
   try {
     const userId = req.params.id;
-    const user = await User.findById(userId).select("-password");
+    const user = await User.findById(userId)
+      .populate({
+        path: "posts",
+        createdAt: -1,
+      })
+      .populate("bookmarks");
     return res.status(200).json({
       user,
       message: "Profile fetched successfully",
@@ -221,6 +226,7 @@ export const followOrUnfollow = async (req, res) => {
         User.updateOne({ _id: myFollow }, { $push: { following: yourFollow } }),
         User.updateOne({ _id: yourFollow }, { $push: { followers: myFollow } }),
       ]);
+
       return res.status(200).json({
         message: "Followed successfully",
         success: true,
