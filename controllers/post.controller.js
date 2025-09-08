@@ -3,6 +3,7 @@ import { Post } from "../models/post.model.js";
 import { User } from "../models/user.model.js";
 import { Comment } from "../models/comment.model.js";
 import cloudinary from "../configs/cloudinary.js";
+import { getReceiverSocketId, io } from "../socket/socket.js";
 export const addNewPost = async (req, res) => {
   try {
     const { caption } = req.body;
@@ -104,6 +105,22 @@ export const likePost = async (req, res) => {
     await post.updateOne({ $addToSet: { likes: mylike } });
     await post.save();
     //implement socket notif
+    const user = await User.findById(mylike).select(
+      "_id username profilePicture"
+    );
+    const postOwnerId = post.author.toString();
+    if (postOwnerId !== mylike) {
+      //emit a notifi
+      const notification = {
+        type: "like",
+        userId: mylike,
+        userDetails: user,
+        postId,
+        message: "Your post was liked",
+      };
+      const postOwnerSocketId = getReceiverSocketId(postOwnerId);
+      io.to(postOwnerSocketId).emit("notification", notification);
+    }
     return res.status(200).json({ message: "Post liked", success: true });
   } catch (error) {
     console.error("Error like post:", error);
@@ -123,6 +140,21 @@ export const dislikePost = async (req, res) => {
     }
     await post.updateOne({ $pull: { likes: mylike } });
     await post.save();
+    //implement socket notif
+    const user = await User.findById(mylike).select("username profilePicture");
+    const postOwnerId = post.author.toString();
+    if (postOwnerId !== mylike) {
+      //emit a notifi
+      const notification = {
+        type: "dislike",
+        userId: mylike,
+        userDetails: user,
+        postId,
+        message: "Your post was disliked",
+      };
+      const postOwnerSocketId = getReceiverSocketId(postOwnerId);
+      io.to(postOwnerSocketId).emit("notification", notification);
+    }
     return res.status(200).json({ message: "Post disliked", success: true });
   } catch (error) {
     console.error("Error dislike post:", error);
@@ -229,7 +261,7 @@ export const bookmarkPost = async (req, res) => {
         .json({ message: "Post not found", success: false });
     }
     let user = await User.findById(authorId);
-    if (user.bookmarks.includes(postId._id)) {
+    if (user.bookmarks.includes(post._id)) {
       await user.updateOne({ $pull: { bookmarks: post._id } });
       await user.save();
       return res
