@@ -238,3 +238,37 @@ export const followOrUnfollow = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const searchUsers = async (req, res) => {
+  try {
+    const query = req.query.q; // Lấy query từ URL, ví dụ: /search?q=john
+    if (!query) {
+      return res.status(400).json({
+        message: "Vui lòng nhập từ khóa tìm kiếm",
+        success: false,
+      });
+    }
+
+    // Tìm users với username chứa query (partial match, case-insensitive)
+    const users = await User.find({
+      username: { $regex: query, $options: "i" }, // 'i' để không phân biệt hoa/thường
+      _id: { $ne: req.id }, // Tùy chọn: Loại trừ chính user đang đăng nhập (nếu bạn muốn)
+    }).select("username _id profilePicture"); // Không trả về password, chỉ lấy các field cần thiết
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        message: "Không tìm thấy người dùng nào",
+        success: false,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Kết quả tìm kiếm",
+      success: true,
+      users, // Trả về array users với _id, username, profilePicture, bio, v.v.
+    });
+  } catch (error) {
+    console.error("Error during user search:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};

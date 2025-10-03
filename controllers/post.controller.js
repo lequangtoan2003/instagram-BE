@@ -2,6 +2,7 @@ import sharp from "sharp";
 import { Post } from "../models/post.model.js";
 import { User } from "../models/user.model.js";
 import { Comment } from "../models/comment.model.js";
+import { formatDistanceToNow } from "date-fns";
 import cloudinary from "../configs/cloudinary.js";
 import { getReceiverSocketId, io } from "../socket/socket.js";
 export const addNewPost = async (req, res) => {
@@ -37,8 +38,24 @@ export const addNewPost = async (req, res) => {
     }
 
     await post.populate({ path: "author", select: "-password" });
+
+    let formattedTime;
+    if (post.createdAt) {
+      const diffMs = Date.now() - new Date(post.createdAt).getTime(); // Tính khoảng cách (ms)
+      const diffSeconds = Math.floor(diffMs / 1000); // Chuyển sang giây
+      formattedTime =
+        diffSeconds <= 60
+          ? "finished" // Dưới hoặc bằng 1 phút thì hiển thị "finished"
+          : formatDistanceToNow(new Date(post.createdAt)); // Trên 1 phút thì format
+    } else {
+      formattedTime = "No time";
+    }
+
+    const postObj = post.toObject(); // Chuyển sang plain object
+    postObj.formattedTime = formattedTime; // Thêm formattedTime vào post
+
     return res.status(201).json({
-      post,
+      post: postObj,
       message: "Post created successfully",
       success: true,
     });
@@ -58,8 +75,28 @@ export const getAllPost = async (req, res) => {
         sort: { createdAt: -1 },
         populate: { path: "author", select: "username profilePicture" },
       });
+
+    // Map qua posts để thêm field formattedTime
+    const formattedPosts = posts.map((post) => {
+      const postObj = post.toObject();
+      if (post.createdAt) {
+        const diffMs = Date.now() - new Date(post.createdAt).getTime(); // Khoảng cách thời gian (ms)
+        const diffSeconds = Math.floor(diffMs / 1000); // Chuyển sang giây
+        postObj.formattedTime =
+          diffSeconds <= 60
+            ? "finished" // Dưới hoặc bằng 1 phút thì hiển thị "finished"
+            : formatDistanceToNow(new Date(post.createdAt)).replace(
+                /^about /,
+                ""
+              ); // Trên 1 phút thì format, và loại bỏ "about " nếu có
+      } else {
+        postObj.formattedTime = "No time"; // Giá trị mặc định nếu createdAt là null
+      }
+      return postObj;
+    });
+
     return res.status(200).json({
-      posts,
+      posts: formattedPosts, // Trả về posts đã format
       message: "Posts fetched successfully",
       success: true,
     });
